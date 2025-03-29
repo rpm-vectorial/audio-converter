@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Converter</title>
+    <style>
+        :root {
+            --primary-color: #6c5ce7;
+            --background-color: #1a1a1a;
+            --card-background: #2d2d2d;
+            --text-color: #ffffff;
+            --border-color: #404040;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: var(--card-background);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+        }
+
+        .upload-area.dragover {
+            background-color: rgba(108, 92, 231, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .format-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        .format-option {
+            padding: 0.5rem 1.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .format-option.selected {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .activation-bytes {
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .activation-bytes.visible {
+            display: block;
+        }
+
+        .activation-bytes input {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: var(--background-color);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .activation-bytes input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .convert-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .convert-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+        }
+
+        .convert-btn:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 1rem;
+            text-align: center;
+            color: #888;
+        }
+
+        .download-link {
+            display: none;
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .download-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .download-link a:hover {
+            text-decoration: underline;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .info-text {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio Converter</h1>
+        <div class="upload-area" id="drop-zone">
+            <p>Drag and drop your audio file here</p>
+            <p>or</p>
+            <button class="convert-btn" onclick="document.getElementById('file-input').click()">
+                Choose File
+            </button>
+            <input type="file" id="file-input" accept=".wav,.mp3,.ogg,.m4a,.flac,.aax">
+            <p class="info-text">Supported formats: WAV, MP3, OGG, M4A, FLAC, AAX</p>
+        </div>
+        
+        <div class="format-selector">
+            <div class="format-option selected" data-format="mp3">MP3</div>
+            <div class="format-option" data-format="wav">WAV</div>
+        </div>
+
+        <div class="activation-bytes" id="activation-bytes">
+            <label for="activation-input">Activation Bytes (for AAX files):</label>
+            <input type="text" id="activation-input" placeholder="Enter your activation bytes">
+            <p class="info-text">Required only for AAX files. Enter your Audible activation bytes.</p>
+        </div>
+
+        <button class="convert-btn" id="convert-btn" disabled>Convert</button>
+        
+        <div class="status" id="status"></div>
+        <div class="download-link" id="download-link"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const convertBtn = document.getElementById('convert-btn');
+        const status = document.getElementById('status');
+        const downloadLink = document.getElementById('download-link');
+        const activationBytesDiv = document.getElementById('activation-bytes');
+        const activationInput = document.getElementById('activation-input');
+        let selectedFile = null;
+
+        // Format selection
+        document.querySelectorAll('.format-option').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.format-option').forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+            });
+        });
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            status.textContent = `Selected file: ${file.name}`;
+            convertBtn.disabled = false;
+            downloadLink.style.display = 'none';
+
+            // Show activation bytes input if file is AAX
+            if (file.name.toLowerCase().endsWith('.aax')) {
+                activationBytesDiv.classList.add('visible');
+            } else {
+                activationBytesDiv.classList.remove('visible');
+            }
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const format = document.querySelector('.format-option.selected').dataset.format;
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('format', format);
+
+            // Add activation bytes if provided
+            if (selectedFile.name.toLowerCase().endsWith('.aax')) {
+                const activationBytes = activationInput.value.trim();
+                if (!activationBytes) {
+                    status.textContent = 'Please enter activation bytes for AAX conversion';
+                    return;
+                }
+                formData.append('activation_bytes', activationBytes);
+            }
+
+            convertBtn.disabled = true;
+            status.textContent = 'Converting...';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.textContent = 'Conversion successful!';
+                    downloadLink.innerHTML = `<a href="${data.download_url}" download>Download Converted File</a>`;
+                    downloadLink.style.display = 'block';
+                } else {
+                    status.textContent = `Error: ${data.error}`;
+                }
+            } catch (error) {
+                status.textContent = 'Error during conversion. Please try again.';
+            } finally {
+                convertBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 
